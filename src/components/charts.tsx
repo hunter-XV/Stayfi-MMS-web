@@ -67,8 +67,8 @@ export function RevenueChart({ dailyRevenue, dailyCost }: RevenueChartProps) {
             borderRadius: "8px",
             fontSize: 12,
           }}
-          formatter={(value: number, name: string) => [
-            `${value.toLocaleString("fr-DZ")} DA`,
+          formatter={(value, name) => [
+            `${Number(value).toLocaleString("fr-DZ")} DA`,
             name === "revenue" ? "إيرادات" : "تكاليف",
           ]}
         />
@@ -128,8 +128,8 @@ export function WholesalePie({
             borderRadius: "8px",
             fontSize: 12,
           }}
-          formatter={(value: number) => [
-            `${value.toLocaleString("fr-DZ")} DA`,
+          formatter={(value) => [
+            `${Number(value).toLocaleString("fr-DZ")} DA`,
           ]}
         />
         <Legend

@@ -2,6 +2,7 @@ import { getDebtClients } from "@/lib/queries";
 import { formatDZD } from "@/lib/currency";
 import { PageHeader, Badge } from "@/components/ui";
 import { Users } from "lucide-react";
+import Link from "next/link";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr-DZ", {
@@ -68,7 +69,11 @@ export default async function DebtsPage() {
                   key={c.id}
                   className="border-b last:border-0 hover:bg-muted/20 transition-colors"
                 >
-                  <td className="py-3 px-4 font-medium">{c.name}</td>
+                  <td className="py-3 px-4 font-medium">
+                    <Link href={`/debts/${c.id}`} className="hover:underline hover:text-primary transition-colors">
+                      {c.name}
+                    </Link>
+                  </td>
                   <td
                     className={`py-3 px-4 text-end font-bold tabular-nums ${
                       c.balance > 0
