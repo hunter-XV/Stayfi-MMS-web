@@ -17,23 +17,26 @@ type Range = "today" | "week" | "month" | "3months";
 function getDateRange(range: Range): { from: string; to: string } {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  const fmt = (d: Date) =>
+  const fmtDate = (d: Date) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const today = fmt(now);
-  if (range === "today") return { from: today, to: today };
+  // Append time boundaries so ISO timestamp comparisons include the full day
+  const startOf = (d: Date) => `${fmtDate(d)}T00:00:00.000Z`;
+  const endOf = (d: Date) => `${fmtDate(d)}T23:59:59.999Z`;
+  const to = endOf(now);
+  if (range === "today") return { from: startOf(now), to };
   if (range === "week") {
     const d = new Date(now);
     d.setDate(d.getDate() - 6);
-    return { from: fmt(d), to: today };
+    return { from: startOf(d), to };
   }
   if (range === "month") {
     const d = new Date(now);
     d.setDate(d.getDate() - 29);
-    return { from: fmt(d), to: today };
+    return { from: startOf(d), to };
   }
   const d = new Date(now);
   d.setDate(d.getDate() - 89);
-  return { from: fmt(d), to: today };
+  return { from: startOf(d), to };
 }
 
 export default async function DashboardPage({
@@ -43,22 +46,16 @@ export default async function DashboardPage({
 }) {
   const { range: rawRange } = await searchParams;
   const range: Range =
-    rawRange === "today" ||
-    rawRange === "week" ||
-    rawRange === "month" ||
-    rawRange === "3months"
+    rawRange === "today" || rawRange === "week" || rawRange === "month" || rawRange === "3months"
       ? rawRange
       : "month";
 
   const { from, to } = getDateRange(range);
   const stats = getDashboardStats(from, to);
-  const margin =
-    stats.totalRevenue > 0
-      ? Math.round((stats.grossProfit / stats.totalRevenue) * 100)
-      : 0;
+  const margin = stats.totalRevenue > 0 ? Math.round((stats.grossProfit / stats.totalRevenue) * 100) : 0;
 
   return (
-    <div className="p-6 space-y-6 max-w-300 mx-auto">
+    <div className="p-6 space-y-6 max-w-[1200px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <PageHeader title="لوحة التحكم" subtitle="نظرة عامة على أداء المتجر" />
@@ -67,11 +64,7 @@ export default async function DashboardPage({
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard
-          title="إجمالي الإيرادات"
-          value={formatDZD(stats.totalRevenue)}
-          icon={<TrendingUp size={18} />}
-        />
+        <StatCard title="إجمالي الإيرادات" value={formatDZD(stats.totalRevenue)} icon={<TrendingUp size={18} />} />
         <StatCard
           title="الربح الإجمالي"
           value={formatDZD(stats.grossProfit)}
@@ -85,11 +78,7 @@ export default async function DashboardPage({
           subtitle={`متوسط السلة: ${formatDZD(stats.avgBasket)}`}
           icon={<ShoppingCart size={18} />}
         />
-        <StatCard
-          title="التكاليف"
-          value={formatDZD(stats.totalCost)}
-          icon={<Package size={18} />}
-        />
+        <StatCard title="التكاليف" value={formatDZD(stats.totalCost)} icon={<Package size={18} />} />
         <StatCard
           title="المرتجعات"
           value={formatDZD(stats.totalReturns)}
@@ -111,10 +100,7 @@ export default async function DashboardPage({
             <p className="font-semibold text-sm">الإيرادات مقابل التكاليف</p>
             <p className="text-xs text-muted-foreground">يومياً</p>
           </div>
-          <RevenueChart
-            dailyRevenue={stats.dailyRevenue}
-            dailyCost={stats.dailyCost}
-          />
+          <RevenueChart dailyRevenue={stats.dailyRevenue} dailyCost={stats.dailyCost} />
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm bg-primary inline-block" />
@@ -131,10 +117,7 @@ export default async function DashboardPage({
             <p className="font-semibold text-sm">الجملة مقابل التجزئة</p>
             <p className="text-xs text-muted-foreground">توزيع الإيرادات</p>
           </div>
-          <WholesalePie
-            wholesaleRevenue={stats.wholesaleRevenue}
-            regularRevenue={stats.regularRevenue}
-          />
+          <WholesalePie wholesaleRevenue={stats.wholesaleRevenue} regularRevenue={stats.regularRevenue} />
         </div>
       </div>
 
@@ -144,9 +127,7 @@ export default async function DashboardPage({
           <p className="font-semibold text-sm">أفضل 5 منتجات — الإيرادات</p>
           <Separator />
           {stats.topByRevenue.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              لا توجد بيانات
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-4">لا توجد بيانات</p>
           ) : (
             <ol className="space-y-3">
               {stats.topByRevenue.map((p, i) => (
@@ -155,9 +136,7 @@ export default async function DashboardPage({
                     {i + 1}
                   </span>
                   <span className="flex-1 text-sm truncate">{p.name}</span>
-                  <span className="text-sm font-semibold tabular-nums">
-                    {formatDZD(p.revenue)}
-                  </span>
+                  <span className="text-sm font-semibold tabular-nums">{formatDZD(p.revenue)}</span>
                 </li>
               ))}
             </ol>
@@ -167,9 +146,7 @@ export default async function DashboardPage({
           <p className="font-semibold text-sm">أفضل 5 منتجات — الكمية</p>
           <Separator />
           {stats.topByQuantity.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              لا توجد بيانات
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-4">لا توجد بيانات</p>
           ) : (
             <ol className="space-y-3">
               {stats.topByQuantity.map((p, i) => (
@@ -178,9 +155,7 @@ export default async function DashboardPage({
                     {i + 1}
                   </span>
                   <span className="flex-1 text-sm truncate">{p.name}</span>
-                  <span className="text-sm font-semibold tabular-nums">
-                    {formatNumber(p.totalQty)} قطعة
-                  </span>
+                  <span className="text-sm font-semibold tabular-nums">{formatNumber(p.totalQty)} قطعة</span>
                 </li>
               ))}
             </ol>
