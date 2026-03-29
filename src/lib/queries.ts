@@ -50,9 +50,19 @@ export function getDashboardStats(
     )
     .get(dateFrom, dateTo) as { totalReturns: number };
 
+  // Cost of returned items — subtract from totalCost so gross profit isn't understated
+  const returnedCostData = db
+    .prepare(
+      `SELECT COALESCE(SUM(r.quantity * si.buy_price), 0) as returnedCost
+     FROM returns r
+     JOIN sale_items si ON r.sale_id = si.sale_id AND r.product_id = si.product_id
+     WHERE r.created_at >= ? AND r.created_at <= ?`
+    )
+    .get(dateFrom, dateTo) as { returnedCost: number };
+
   const topByRevenue = db
     .prepare(
-      `SELECT si.name, SUM(si.unit_price * si.quantity) as revenue
+      `SELECT si.name, SUM(COALESCE(NULLIF(si.total_price, 0), si.unit_price * si.quantity)) as revenue
      FROM sale_items si JOIN sales s ON si.sale_id = s.id
      WHERE s.created_at >= ? AND s.created_at <= ? AND si.is_custom = 0
      GROUP BY si.name ORDER BY revenue DESC LIMIT 5`
@@ -70,11 +80,24 @@ export function getDashboardStats(
 
   const dailyRevenue = db
     .prepare(
-      `SELECT DATE(s.created_at) as date, SUM(s.total) as revenue
-     FROM sales s WHERE s.created_at >= ? AND s.created_at <= ?
-     GROUP BY DATE(s.created_at) ORDER BY date`
+      `SELECT
+        d.date,
+        d.revenue - COALESCE(dr.returnTotal, 0) as revenue
+      FROM (
+        SELECT DATE(s.created_at) as date, SUM(s.total) as revenue
+        FROM sales s
+        WHERE s.created_at >= ? AND s.created_at <= ?
+        GROUP BY DATE(s.created_at)
+      ) d
+      LEFT JOIN (
+        SELECT DATE(r.created_at) as date, SUM(r.unit_price * r.quantity) as returnTotal
+        FROM returns r
+        WHERE r.created_at >= ? AND r.created_at <= ?
+        GROUP BY DATE(r.created_at)
+      ) dr ON d.date = dr.date
+      ORDER BY d.date`
     )
-    .all(dateFrom, dateTo) as Array<{ date: string; revenue: number }>;
+    .all(dateFrom, dateTo, dateFrom, dateTo) as Array<{ date: string; revenue: number }>;
 
   const dailyCost = db
     .prepare(
@@ -88,8 +111,8 @@ export function getDashboardStats(
   const wholesaleStats = db
     .prepare(
       `SELECT
-      SUM(CASE WHEN si.is_wholesale = 1 THEN si.unit_price * si.quantity ELSE 0 END) as wholesaleRevenue,
-      SUM(CASE WHEN si.is_wholesale = 0 AND si.is_custom = 0 THEN si.unit_price * si.quantity ELSE 0 END) as regularRevenue
+      SUM(CASE WHEN si.is_wholesale = 1 THEN COALESCE(NULLIF(si.total_price, 0), si.unit_price * si.quantity) ELSE 0 END) as wholesaleRevenue,
+      SUM(CASE WHEN si.is_wholesale = 0 AND si.is_custom = 0 THEN COALESCE(NULLIF(si.total_price, 0), si.unit_price * si.quantity) ELSE 0 END) as regularRevenue
      FROM sale_items si JOIN sales s ON si.sale_id = s.id
      WHERE s.created_at >= ? AND s.created_at <= ?`
     )
@@ -105,11 +128,12 @@ export function getDashboardStats(
     .get() as { count: number };
 
   const revenue = salesData.totalRevenue - returnsData.totalReturns;
+  const netCost = costData.totalCost - returnedCostData.returnedCost;
 
   return {
     totalRevenue: revenue,
-    totalCost: costData.totalCost,
-    grossProfit: revenue - costData.totalCost,
+    totalCost: netCost,
+    grossProfit: revenue - netCost,
     salesCount: salesData.salesCount,
     avgBasket:
       salesData.salesCount > 0
@@ -182,8 +206,8 @@ export function getProducts(search?: string): ProductRow[] {
   const params: string[] = [];
 
   if (search) {
-    query += ` WHERE name LIKE ?`;
-    params.push(`%${search}%`);
+    query += ` WHERE (name LIKE ? OR barcode LIKE ?)`;
+    params.push(`%${search}%`, `%${search}%`);
   }
   query += ` ORDER BY name`;
 
@@ -210,4 +234,34 @@ export function getDebtClients(): DebtClientRow[] {
       FROM debt_clients dc ORDER BY dc.updated_at DESC`
     )
     .all() as DebtClientRow[];
+}
+
+export function getDebtClient(id: number): DebtClientRow | undefined {
+  const db = getRawDb();
+  return db
+    .prepare(
+      `SELECT dc.id, dc.uuid, dc.name, dc.balance, dc.created_at as createdAt,
+      (SELECT COUNT(*) FROM debt_transactions dt WHERE dt.client_id = dc.id) as transactionCount
+      FROM debt_clients dc WHERE dc.id = ?`
+    )
+    .get(id) as DebtClientRow | undefined;
+}
+
+export interface DebtTransactionRow {
+  id: number;
+  clientId: number;
+  type: string;
+  amount: number;
+  description: string | null;
+  createdAt: string;
+}
+
+export function getDebtTransactions(clientId: number): DebtTransactionRow[] {
+  const db = getRawDb();
+  return db
+    .prepare(
+      `SELECT id, client_id as clientId, type, amount, description, created_at as createdAt
+      FROM debt_transactions WHERE client_id = ? ORDER BY created_at DESC`
+    )
+    .all(clientId) as DebtTransactionRow[];
 }

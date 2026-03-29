@@ -6,7 +6,7 @@ interface StatCardProps {
   subtitle?: string;
   icon?: ReactNode;
   trend?: "up" | "down" | "neutral";
-  highlight?: "default" | "success" | "destructive";
+  highlight?: "default" | "success" | "destructive" | "warning";
 }
 
 export function StatCard({
@@ -20,6 +20,7 @@ export function StatCard({
     default: "text-foreground",
     success: "text-green-600 dark:text-green-400",
     destructive: "text-destructive",
+    warning: "text-amber-600 dark:text-amber-400",
   };
 
   return (

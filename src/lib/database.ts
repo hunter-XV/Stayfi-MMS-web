@@ -48,6 +48,8 @@ function initTables(sqlite: Database.Database) {
       uuid        TEXT NOT NULL UNIQUE,
       session_id  INTEGER,
       total       INTEGER NOT NULL DEFAULT 0,
+      given_amount INTEGER,
+      change      INTEGER,
       created_at  TEXT NOT NULL,
       synced_at   TEXT
     );
@@ -59,6 +61,7 @@ function initTables(sqlite: Database.Database) {
       name        TEXT NOT NULL,
       quantity    INTEGER NOT NULL DEFAULT 1,
       unit_price  INTEGER NOT NULL DEFAULT 0,
+      total_price INTEGER NOT NULL DEFAULT 0,
       buy_price   INTEGER NOT NULL DEFAULT 0,
       is_wholesale INTEGER NOT NULL DEFAULT 0,
       is_custom   INTEGER NOT NULL DEFAULT 0,
@@ -81,6 +84,7 @@ function initTables(sqlite: Database.Database) {
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       uuid        TEXT NOT NULL UNIQUE,
       name        TEXT NOT NULL,
+      phone       TEXT,
       balance     INTEGER NOT NULL DEFAULT 0,
       created_at  TEXT NOT NULL,
       updated_at  TEXT NOT NULL,
@@ -97,6 +101,35 @@ function initTables(sqlite: Database.Database) {
       created_at  TEXT NOT NULL,
       synced_at   TEXT
     );
+  `);
+
+  // Lightweight migrations for existing local web DBs
+  try {
+    sqlite.exec(`ALTER TABLE sale_items ADD COLUMN total_price INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // column already exists
+  }
+  try {
+    sqlite.exec(`ALTER TABLE debt_clients ADD COLUMN phone TEXT`);
+  } catch {
+    // column already exists
+  }
+  try {
+    sqlite.exec(`ALTER TABLE sales ADD COLUMN given_amount INTEGER`);
+  } catch {
+    // column already exists
+  }
+  try {
+    sqlite.exec(`ALTER TABLE sales ADD COLUMN change INTEGER`);
+  } catch {
+    // column already exists
+  }
+
+  // Backfill rows created before total_price existed
+  sqlite.exec(`
+    UPDATE sale_items
+    SET total_price = unit_price * quantity
+    WHERE total_price = 0
   `);
 }
 

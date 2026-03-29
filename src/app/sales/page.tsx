@@ -9,23 +9,26 @@ type Range = "today" | "week" | "month" | "3months";
 function getDateRange(range: Range): { from: string; to: string } {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  const fmt = (d: Date) =>
+  const fmtDate = (d: Date) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const today = fmt(now);
-  if (range === "today") return { from: today, to: today };
+  // Append time boundaries so ISO timestamp comparisons include the full day
+  const startOf = (d: Date) => `${fmtDate(d)}T00:00:00.000Z`;
+  const endOf = (d: Date) => `${fmtDate(d)}T23:59:59.999Z`;
+  const to = endOf(now);
+  if (range === "today") return { from: startOf(now), to };
   if (range === "week") {
     const d = new Date(now);
     d.setDate(d.getDate() - 6);
-    return { from: fmt(d), to: today };
+    return { from: startOf(d), to };
   }
   if (range === "month") {
     const d = new Date(now);
     d.setDate(d.getDate() - 29);
-    return { from: fmt(d), to: today };
+    return { from: startOf(d), to };
   }
   const d = new Date(now);
   d.setDate(d.getDate() - 89);
-  return { from: fmt(d), to: today };
+  return { from: startOf(d), to };
 }
 
 function formatDateTime(iso: string) {

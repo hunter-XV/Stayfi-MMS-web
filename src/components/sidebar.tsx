@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   LayoutDashboard,
   ShoppingCart,
   Package,
   Users,
   Store,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 const links = [
@@ -19,6 +22,16 @@ const links = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [dark, setDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("theme") === "dark";
+  });
+
+  const toggleDark = () => {
+    const isDark = document.documentElement.classList.toggle("dark");
+    setDark(isDark);
+    localStorage.setItem("theme", isDark ? "dark" : "light");
+  };
 
   return (
     <aside className="w-56 shrink-0 border-e border-border bg-card flex flex-col h-full">
@@ -55,7 +68,15 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border space-y-2">
+        <button
+          onClick={toggleDark}
+          className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          title={dark ? "الوضع الفاتح" : "الوضع الداكن"}
+        >
+          {dark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          {dark ? "فاتح" : "داكن"}
+        </button>
         <p className="text-xs text-muted-foreground text-center">
           StayEFI Dashboard
         </p>
